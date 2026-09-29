@@ -1,0 +1,55 @@
+const express = require('express');
+const cors = require('cors');
+
+const app = express();
+const PORT = 3000;
+
+const API_KEY = process.env.TINYFISH_API_KEY;
+
+app.use(cors());
+app.use(express.json());
+app.use(express.static('.'));
+
+app.post('/api/research', async (req, res) => {
+  const { query } = req.body;
+
+  if (!query || !query.trim()) {
+    return res.status(400).json({ error: 'Please enter a research question.' });
+  }
+
+  if (!API_KEY) {
+    return res.status(500).json({ error: 'Server is missing TINYFISH_API_KEY environment variable.' });
+  }
+
+  try {
+    const url = new URL('https://api.search.tinyfish.ai');
+    url.searchParams.set('query', query.trim());
+    url.searchParams.set('location', 'US');
+    url.searchParams.set('language', 'en');
+
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        'X-API-Key': API_KEY
+      }
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('TinyFish error:', response.status, errorText);
+      return res.status(response.status).json({
+        error: `Research failed (${response.status}). Please try again.`
+      });
+    }
+
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong while researching. Please try again.' });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`Web Researcher running at http://localhost:${PORT}`);
+});
